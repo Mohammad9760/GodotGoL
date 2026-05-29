@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://clqkm3nu6aedl"
+path="res://.godot/imported/butterfly.png-860a5e87cec24763d7da34076000f6ba.image"
+
+[deps]
+
+source_file="res://worlds/butterfly.png"
+dest_files=["res://.godot/imported/butterfly.png-860a5e87cec24763d7da34076000f6ba.image"]
+
+[params]
+

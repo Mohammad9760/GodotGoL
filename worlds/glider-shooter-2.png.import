@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bwrst6871rymr"
+path="res://.godot/imported/glider-shooter-2.png-4a7e0ed29a94ab84d94daeda985b5942.image"
+
+[deps]
+
+source_file="res://worlds/glider-shooter-2.png"
+dest_files=["res://.godot/imported/glider-shooter-2.png-4a7e0ed29a94ab84d94daeda985b5942.image"]
+
+[params]
+

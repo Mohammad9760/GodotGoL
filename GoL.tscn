@@ -1,0 +1,58 @@
+[gd_scene load_steps=8 format=3 uid="uid://bnr0vljg1u5nx"]
+
+[ext_resource type="Script" uid="uid://c11sy76upbmsq" path="res://src/GoL.gd" id="1_c28oo"]
+[ext_resource type="Image" uid="uid://bodvsmvbbrwqo" path="res://worlds/dua-lipa.png" id="2_c28oo"]
+[ext_resource type="Material" uid="uid://cihb3yr5sjbbl" path="res://Gol.tres" id="3_gpo4b"]
+[ext_resource type="Script" uid="uid://ddmcajs83p42r" path="res://src/LabelFPS.gd" id="4_8vfgv"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_c4cau"]
+font_color = Color(0.8, 0, 0, 1)
+
+[sub_resource type="SystemFont" id="SystemFont_c28oo"]
+font_names = PackedStringArray("MathJax_AMS")
+
+[sub_resource type="LabelSettings" id="LabelSettings_fswo6"]
+font = SubResource("SystemFont_c28oo")
+font_size = 32
+
+[node name="root" type="Node"]
+
+[node name="simulation" type="Node" parent="."]
+script = ExtResource("1_c28oo")
+wrap_borders = true
+init_world = ExtResource("2_c28oo")
+buffer_size = Vector2i(128, 72)
+pointer_radius = 8.0
+render_material = ExtResource("3_gpo4b")
+
+[node name="GoL-display" type="ColorRect" parent="."]
+material = ExtResource("3_gpo4b")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+
+[node name="FPS-counter" type="Label" parent="GoL-display"]
+layout_mode = 0
+offset_right = 166.0
+offset_bottom = 87.0
+text = "FPS = ?"
+label_settings = SubResource("LabelSettings_c4cau")
+script = ExtResource("4_8vfgv")
+
+[node name="FPS-counter2" type="Label" parent="GoL-display"]
+visible = false
+layout_mode = 0
+offset_left = 108.0
+offset_top = 160.0
+offset_right = 504.0
+offset_bottom = 361.0
+text = "JOHN HORTON CONWAY
+1937 - 2020"
+label_settings = SubResource("LabelSettings_fswo6")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Camera" type="Camera3D" parent="."]

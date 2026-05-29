@@ -1,0 +1,8 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://cihb3yr5sjbbl"]
+
+[ext_resource type="Shader" uid="uid://bnrw8xjm3n536" path="res://src/GoL.gdshader" id="1_4fynw"]
+
+[resource]
+shader = ExtResource("1_4fynw")
+shader_parameter/resolution = Vector2i(0, 0)
+shader_parameter/color = Color(0.8, 0.8, 0.8, 1)

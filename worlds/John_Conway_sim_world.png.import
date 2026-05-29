@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bbs2f5bem5t2s"
+path="res://.godot/imported/John_Conway_sim_world.png-470000b33cc808ee8d31fc25096ee881.image"
+
+[deps]
+
+source_file="res://worlds/John_Conway_sim_world.png"
+dest_files=["res://.godot/imported/John_Conway_sim_world.png-470000b33cc808ee8d31fc25096ee881.image"]
+
+[params]
+

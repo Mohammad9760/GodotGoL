@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://c6pie3terp30r"
+path="res://.godot/imported/intro.png-4df52fd3424fc52107401ae4f847b6b9.image"
+
+[deps]
+
+source_file="res://worlds/intro.png"
+dest_files=["res://.godot/imported/intro.png-4df52fd3424fc52107401ae4f847b6b9.image"]
+
+[params]
+
