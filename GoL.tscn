@@ -1,7 +1,6 @@
-[gd_scene load_steps=8 format=3 uid="uid://bnr0vljg1u5nx"]
+[gd_scene load_steps=7 format=3 uid="uid://bnr0vljg1u5nx"]
 
 [ext_resource type="Script" uid="uid://c11sy76upbmsq" path="res://src/GoL.gd" id="1_c28oo"]
-[ext_resource type="Image" uid="uid://bodvsmvbbrwqo" path="res://worlds/dua-lipa.png" id="2_c28oo"]
 [ext_resource type="Material" uid="uid://cihb3yr5sjbbl" path="res://Gol.tres" id="3_gpo4b"]
 [ext_resource type="Script" uid="uid://ddmcajs83p42r" path="res://src/LabelFPS.gd" id="4_8vfgv"]
 
@@ -20,8 +19,10 @@ font_size = 32
 [node name="simulation" type="Node" parent="."]
 script = ExtResource("1_c28oo")
 wrap_borders = true
-init_world = ExtResource("2_c28oo")
-buffer_size = Vector2i(128, 72)
+init_with = 2
+rle_world = "res://patterns/p100-H-channel-breeder.rle"
+buffer_size = Vector2i(1280, 720)
+after_glow = 0.6
 pointer_radius = 8.0
 render_material = ExtResource("3_gpo4b")
 

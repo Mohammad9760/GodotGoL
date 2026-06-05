@@ -15,7 +15,7 @@ vec3 hsv2rgb(vec3 c)
 void fragment()
 {
 	vec2 cell = texture(buffer, UV).rg;
-	vec3 c = vec3(hsv2rgb(vec3(mod(0.8 * TIME + 0.7, 1.0), (1.0 - cell.g), cell.g)));
-	COLOR.rgb = c;
-	//COLOR.rgb = color * cell.g;
+	//vec3 c = vec3(hsv2rgb(vec3(mod(0.8 * TIME + 0.7, 1.0), (1.0 - cell.g), cell.g)));
+	//COLOR.rgb = c;
+	COLOR.rgb = color * cell.g;
 }

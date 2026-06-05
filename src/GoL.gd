@@ -5,11 +5,12 @@ class_name Simulation
 var cap_fps : int = 0
 @export
 var wrap_borders : bool
-enum init_state {NO_LIFE, RANDOM, WORLD}
+enum init_state {NO_LIFE, RANDOM, PATTERN}
 @export
 var init_with : init_state = init_state.NO_LIFE
-@export
-var init_world : Image
+#@export
+#var world : Image
+@export_file("*.rle") var rle_world : String
 
 @export
 var buffer_size = Vector2i(512, 288) # keep it 16:9 so the cells are displayed as squares
@@ -29,7 +30,7 @@ var rdmain := RenderingServer.get_rendering_device()
 var textureRD: Texture2DRD # render texture to use the store the simulation results in
 var shader : RID
 var pipeline : RID
-var fmt := RDTextureFormat.new()
+#var fmt := RDTextureFormat.new()
 var view := RDTextureView.new()
 var input_buffer : RID
 var output_buffer : RID
@@ -38,7 +39,7 @@ var output_buffer : RID
 var render_material := ShaderMaterial.new()
 
 #@onready var screen_size := get_viewport().get_visible_rect().size
-static var sim_paused :bool = false
+static var sim_paused :bool = true
 var sim_step_forward :bool = false
 
 
@@ -61,22 +62,9 @@ func _input(event: InputEvent) -> void:
 func _ready():
 	Engine.max_fps = cap_fps
 	
-	if init_with == init_state.WORLD:
-		buffer_size.x = init_world.get_width()
-		buffer_size.y = init_world.get_height()
-	
 	# way better performance without scaling
 	get_window().size = buffer_size
 	
-	fmt.width = buffer_size.x
-	fmt.height = buffer_size.y
-	fmt.format = RenderingDevice.DATA_FORMAT_R32G32_SFLOAT
-	#fmt.format = RenderingDevice.DATA_FORMAT_R32_SFLOAT
-	#fmt.format = RenderingDevice.DATA_FORMAT_R32G32B32A32_SFLOAT
-	fmt.usage_bits = RenderingDevice.TEXTURE_USAGE_CAN_UPDATE_BIT \
-					| RenderingDevice.TEXTURE_USAGE_STORAGE_BIT \
-					#| RenderingDevice.TEXTURE_USAGE_CAN_COPY_FROM_BIT \
-					| RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT
 	view = RDTextureView.new()
 	textureRD = Texture2DRD.new()
 	RenderingServer.call_on_render_thread(rebuild_buffers)
@@ -91,9 +79,8 @@ func _exit_tree():
 		textureRD.texture_rd_rid = RID()
 	RenderingServer.call_on_render_thread(_free_compute_resources)
 
-
-func rebuild_buffers():
-	var empty_texture := Image.create_empty(
+func init_world() -> Image:
+	var world_texture := Image.create_empty(
 		buffer_size.x,
 		buffer_size.y,
 		false,
@@ -101,26 +88,89 @@ func rebuild_buffers():
 		#Image.FORMAT_RF
 	)
 	
+	match init_with:
+		init_state.NO_LIFE: # simulation starts with every cell being dead
+			world_texture.fill(Color.BLACK);
+		init_state.RANDOM: # simulation starts with each cell being in a random state
+			for i in (buffer_size.x * buffer_size.y) - 1:
+				var x :int= i % buffer_size.x
+				@warning_ignore("integer_division")
+				var y :int= i / buffer_size.x
+				world_texture.set_pixel(x, y, Color(randi_range(0, 1), 0.0, 0.0, 0.0))
+		init_state.PATTERN: # simulation starts with cell states loaded from a pattern file (.rle)
+				var pattern_file = FileAccess.open(rle_world, FileAccess.READ)
+				var content = pattern_file.get_as_text()
+				var data : String
+				var pattern_size : Vector2i
+				# finds digits of any length '\d+' after 'x = '
+				var pattern_size_regex = RegEx.create_from_string(r'(?<=x = )\d+')
+				pattern_size.x = int(pattern_size_regex.search(content).get_string())
+				# finds digits of any length '\d+' after 'y = '
+				pattern_size_regex.compile(r'(?<=y = )\d+')
+				pattern_size.y = int(pattern_size_regex.search(content).get_string())
+				
+				# match lines starting with # and x and the ! character 
+				var not_data = RegEx.create_from_string(r'#.+\s|x.+\n|!|\n')
+				# we remove the ! character that denotes the last row
+				# but we want to match the last row as a row so we add the $
+				# I did try not removing the ! and matching rows with anything
+				# that is followed by a $ or ! but it messed with the order of the match
+				data = not_data.sub(content, "", true) + "$"
+				#print("Pattern Size is: ", pattern_size)
+				
+				# the pattern should fit inside the world
+				if max(buffer_size.x, buffer_size.y) < min(pattern_size.x, pattern_size.y):
+					buffer_size = pattern_size * 4
+				
+				# place the pattern at the center of the world
+				var pattern_pos : Vector2i = (buffer_size / 2) - (pattern_size / 2)
+				#var pattern_pos : Vector2i = Vector2i.ZERO
+				
+				world_texture.fill(Color.BLACK)
+				
+				# rows are separated with the $ character
+				var get_rows = RegEx.create_from_string(r'(\d*[bo])*[\$]')
+				var rows = get_rows.search_all(data)
+				for row in rows:
+					print(row.get_string())
+					var pixel_index_in_row : int = 0
+					# any number of digits followed by a 'b' or an 'o'
+					var run_length = RegEx.create_from_string(r'\d*[bo]')
+					for r in run_length.search_all(row.get_string()):
+						print(r.get_string())
+						var alive : bool = r.get_string().ends_with("o")
+						var length : int = int(r.get_string())
+						if r.get_string().length() == 1: length = 1
+						if not alive:
+							pixel_index_in_row += length
+						else:
+							for i in range(length):
+								world_texture.set_pixel(pattern_pos.x + pixel_index_in_row, pattern_pos.y, 
+								Color.WHITE)
+								pixel_index_in_row += 1
+					pattern_pos.y += 1
+				
+	return world_texture
 	
+
+func rebuild_buffers():
+	var world_texture := init_world()
+	var data := world_texture.get_data()
+	var fmt := RDTextureFormat.new()
+	#if init_with == init_state.PATTERN:
+		#buffer_size.x = world_texture.get_width()
+		#buffer_size.y = world_texture.get_height()
 	
-	# INITIALIZE THE WORLD
-	var color :Color = Color.BLACK
-	for i in (buffer_size.x * buffer_size.y) - 1:
-		var x :int= i % buffer_size.x
-		@warning_ignore("integer_division")
-		var y :int= i / buffer_size.x
-		match init_with:
-			init_state.RANDOM:
-				color = Color(randi_range(0, 1), 0.0, 0.0, 0.0)
-			init_state.WORLD:
-				color = init_world.get_pixel(x, y)
-		
-		empty_texture.set_pixel(
-			x, y,
-			color
-		)
+	fmt.width = buffer_size.x
+	fmt.height = buffer_size.y
+	fmt.format = RenderingDevice.DATA_FORMAT_R32G32_SFLOAT
+	#fmt.format = RenderingDevice.DATA_FORMAT_R32_SFLOAT
+	#fmt.format = RenderingDevice.DATA_FORMAT_R32G32B32A32_SFLOAT
+	fmt.usage_bits = RenderingDevice.TEXTURE_USAGE_CAN_UPDATE_BIT \
+					| RenderingDevice.TEXTURE_USAGE_STORAGE_BIT \
+					#| RenderingDevice.TEXTURE_USAGE_CAN_COPY_FROM_BIT \
+					| RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT
 	
-	var data := empty_texture.get_data()
 	input_buffer = rdmain.texture_create(fmt, RDTextureView.new(), [data])
 	output_buffer = rdmain.texture_create(fmt, RDTextureView.new(), [data])
 	
