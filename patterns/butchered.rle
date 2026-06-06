@@ -1,8 +1,3 @@
-#C c/4 diagonal switch-engine breeder
-#C two of Hartmut Holzwart's diagonal c/4 tub-and-beehive puffer
-#C and a c/2 period 392 backward rake interact to produce
-#C block-laying switch engines: David Bell, 23 July 2005
-x = 152, y = 94, rule = B3/S23
 77b2o$77bobo$77bo$80bo$80b2o$80b2o$79b2o$75b2ob2o$75bo4bo$75bob4o$79b
 2o$79b2o$79b2o$81bob3o$77bo2bo$76b5o6bo$76bo2b2o5bobo$74bobo10bo$73b3o
 4bo$73bo2b2o$77b3o$77b2o10bo$79bo8bobo3bo$77bobo8bobo2bobo$70b2o4b2o

@@ -67,7 +67,7 @@ func _ready():
 	
 	view = RDTextureView.new()
 	textureRD = Texture2DRD.new()
-	RenderingServer.call_on_render_thread(rebuild_buffers)
+	RenderingServer.call_on_render_thread(build_buffers)
 
 func _process(_delta):
 	if not sim_paused or sim_step_forward:
@@ -79,6 +79,7 @@ func _exit_tree():
 		textureRD.texture_rd_rid = RID()
 	RenderingServer.call_on_render_thread(_free_compute_resources)
 
+const O_CHAR = "o"
 func init_world() -> Image:
 	var world_texture := Image.create_empty(
 		buffer_size.x,
@@ -98,6 +99,9 @@ func init_world() -> Image:
 				var y :int= i / buffer_size.x
 				world_texture.set_pixel(x, y, Color(randi_range(0, 1), 0.0, 0.0, 0.0))
 		init_state.PATTERN: # simulation starts with cell states loaded from a pattern file (.rle)
+#				I'm gonna use RegEx to decode the RLEs, it's not the fastest but perhaps the simplest
+#				way to do this. it is 0.002026 of a second slower when compared to an ASCII decoder in
+#				opening a medium sized rle file, but I like RegEx, so I don't care
 				var pattern_file = FileAccess.open(rle_world, FileAccess.READ)
 				var content = pattern_file.get_as_text()
 				var data : String
@@ -116,7 +120,7 @@ func init_world() -> Image:
 				# I did try not removing the ! and matching rows with anything
 				# that is followed by a $ or ! but it messed with the order of the match
 				data = not_data.sub(content, "", true) + "$"
-				#print("Pattern Size is: ", pattern_size)
+				print("Pattern Size: ", pattern_size)
 				
 				# the pattern should fit inside the world
 				if max(buffer_size.x, buffer_size.y) < min(pattern_size.x, pattern_size.y):
@@ -132,13 +136,13 @@ func init_world() -> Image:
 				var get_rows = RegEx.create_from_string(r'(\d*[bo])*[\$]')
 				var rows = get_rows.search_all(data)
 				for row in rows:
-					print(row.get_string())
+					#print(row.get_string())
 					var pixel_index_in_row : int = 0
 					# any number of digits followed by a 'b' or an 'o'
 					var run_length = RegEx.create_from_string(r'\d*[bo]')
 					for r in run_length.search_all(row.get_string()):
-						print(r.get_string())
-						var alive : bool = r.get_string().ends_with("o")
+						#print(r.get_string())
+						var alive : bool = r.get_string().ends_with(O_CHAR)
 						var length : int = int(r.get_string())
 						if r.get_string().length() == 1: length = 1
 						if not alive:
@@ -153,7 +157,7 @@ func init_world() -> Image:
 	return world_texture
 	
 
-func rebuild_buffers():
+func build_buffers():
 	var world_texture := init_world()
 	var data := world_texture.get_data()
 	var fmt := RDTextureFormat.new()
