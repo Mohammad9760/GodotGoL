@@ -21,9 +21,19 @@ var shader_local_size_y := 16
 var after_glow = 0.97
 @export_range(0.25, 100.0, 0.25, "pointer radius in pixel/cells")
 var pointer_radius = 1.0
-var pointer_x = 128.0
-var pointer_y = 72.0
+var pointer_x = 0.0
+var pointer_y = 0.0
 var pointer_buttons = 0.0 # -1 when RMB pressed, 1 when LMB pressed, 0 for nothing
+
+var zoom_amount := 1.0:
+	set(value):
+		zoom_amount = clamp(value, 0.05, 1.0)
+		render_material.set_shader_parameter("zoom", zoom_amount)
+
+var zoom_pos := Vector2(0.5, 0.5):
+	set(value):
+		zoom_pos = value
+		render_material.set_shader_parameter("zoom_center", zoom_pos)
 
 
 var rdmain := RenderingServer.get_rendering_device()
@@ -55,9 +65,23 @@ func _input(event: InputEvent) -> void:
 	var screen_size := get_viewport().get_visible_rect().size
 	
 	if event is InputEventMouseMotion:
-		pointer_x = (event.position.x / screen_size.x) * buffer_size.x
-		pointer_y = (event.position.y / screen_size.y) * buffer_size.y
+		pointer_x = (((event.position.x / screen_size.x) - zoom_pos.x) * zoom_amount + zoom_pos.x) * buffer_size.x
+		pointer_y = (((event.position.y / screen_size.y) - zoom_pos.y) * zoom_amount + zoom_pos.y) * buffer_size.y
+		
+		# pan the view with middle mouse drag
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE):
+			zoom_pos -= event.relative / screen_size
 
+#func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			zoom_pos = (((event.position / screen_size) - zoom_pos) * zoom_amount + zoom_pos)
+			zoom_amount -= 0.05
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			zoom_pos = (((event.position / screen_size) - zoom_pos) * zoom_amount + zoom_pos)
+			zoom_amount += 0.05
+	#render_material.set_shader_parameter("zoom", zoom_amount)
+	#render_material.set_shader_parameter("zoom_center", zoom_pos)
 
 func _ready():
 	Engine.max_fps = cap_fps
@@ -125,7 +149,7 @@ func init_world() -> Image:
 				# the pattern should fit inside the world
 				if buffer_size.x < pattern_size.x or buffer_size.y < pattern_size.y: 
 					print("fuuuuuuck")
-					#buffer_size *= 2
+					#buffer_size = pattern_size
 				# I need to find a way to scale up the buffer so that the pattern fits
 				print("Buffer Size: ", buffer_size)
 				
