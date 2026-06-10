@@ -123,8 +123,11 @@ func init_world() -> Image:
 				print("Pattern Size: ", pattern_size)
 				
 				# the pattern should fit inside the world
-				if max(buffer_size.x, buffer_size.y) < min(pattern_size.x, pattern_size.y):
-					buffer_size = pattern_size * 4
+				if buffer_size.x < pattern_size.x or buffer_size.y < pattern_size.y: 
+					print("fuuuuuuck")
+					#buffer_size *= 2
+				# I need to find a way to scale up the buffer so that the pattern fits
+				print("Buffer Size: ", buffer_size)
 				
 				# place the pattern at the center of the world
 				var pattern_pos : Vector2i = (buffer_size / 2) - (pattern_size / 2)
