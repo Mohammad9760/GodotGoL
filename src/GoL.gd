@@ -32,9 +32,12 @@ var zoom_amount := 1.0:
 
 var zoom_pos := Vector2(0.5, 0.5):
 	set(value):
-		zoom_pos = value
+		#zoom_pos = clamp(value, Vector2.ZERO, Vector2.ONE)
+		zoom_pos.x = clamp(value.x, 0., 1.)
+		zoom_pos.y = clamp(value.y, 0., 1.)
 		render_material.set_shader_parameter("zoom_center", zoom_pos)
-
+@export var zoom_speed := 1.0
+@export var pan_speed := 1.0
 
 var rdmain := RenderingServer.get_rendering_device()
 var textureRD: Texture2DRD # render texture to use the store the simulation results in
@@ -70,16 +73,16 @@ func _input(event: InputEvent) -> void:
 		
 		# pan the view with middle mouse drag
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE):
-			zoom_pos -= event.relative / screen_size
+			zoom_pos -= event.relative / screen_size * zoom_amount * pan_speed
 
 #func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			zoom_pos = (((event.position / screen_size) - zoom_pos) * zoom_amount + zoom_pos)
-			zoom_amount -= 0.05
+			zoom_amount -= 0.05 * zoom_speed
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			zoom_pos = (((event.position / screen_size) - zoom_pos) * zoom_amount + zoom_pos)
-			zoom_amount += 0.05
+			zoom_amount += 0.05 * zoom_speed
 	#render_material.set_shader_parameter("zoom", zoom_amount)
 	#render_material.set_shader_parameter("zoom_center", zoom_pos)
 
@@ -201,6 +204,7 @@ func build_buffers():
 					| RenderingDevice.TEXTURE_USAGE_STORAGE_BIT \
 					#| RenderingDevice.TEXTURE_USAGE_CAN_COPY_FROM_BIT \
 					| RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT
+					#| RenderingDevice.SamplerRepeatMode.SAMPLER_REPEAT_MODE_REPEAT
 	
 	input_buffer = rdmain.texture_create(fmt, RDTextureView.new(), [data])
 	output_buffer = rdmain.texture_create(fmt, RDTextureView.new(), [data])

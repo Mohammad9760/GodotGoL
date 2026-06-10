@@ -1,6 +1,6 @@
 shader_type canvas_item;
 
-uniform sampler2D buffer : filter_nearest, repeat_disable;
+uniform sampler2D buffer : filter_nearest;
 uniform ivec2 resolution; // draw the grid with this
 uniform vec3 color : source_color = vec3(0.8);
 
