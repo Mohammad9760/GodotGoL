@@ -21,21 +21,33 @@ var shader_local_size_y := 16
 var after_glow = 0.97
 @export_range(0.25, 100.0, 0.25, "pointer radius in pixel/cells")
 var pointer_radius = 1.0
-var pointer_x = 0.0
-var pointer_y = 0.0
+var pointer
 var pointer_buttons = 0.0 # -1 when RMB pressed, 1 when LMB pressed, 0 for nothing
+
+var window_aspect_ratio:
+	get: return Vector2(get_window().size) / minf(get_window().size.x, get_window().size.y)
+
+var normalized_window_aspect_ratio:
+	get: return Vector2(get_window().size) / maxf(get_window().size.x, get_window().size.y)
+ 
+var max_zoom:
+	get: return minf(normalized_window_aspect_ratio.x, normalized_window_aspect_ratio.y)
 
 var zoom_amount := 1.0:
 	set(value):
+		#zoom_amount = clamp(value, 0.05, max_zoom)
 		zoom_amount = clamp(value, 0.05, 1.0)
 		render_material.set_shader_parameter("zoom", zoom_amount)
 
 var zoom_pos := Vector2(0.5, 0.5):
 	set(value):
-		#zoom_pos = clamp(value, Vector2.ZERO, Vector2.ONE)
+		zoom_pos = value
 		zoom_pos.x = clamp(value.x, 0., 1.)
 		zoom_pos.y = clamp(value.y, 0., 1.)
+		#zoom_pos.x = clamp(value.x, 0., 1.0 * normalized_window_aspect_ratio.y)
+		#zoom_pos.y = clamp(value.y, 0., 1.0 * normalized_window_aspect_ratio.x)
 		render_material.set_shader_parameter("zoom_center", zoom_pos)
+
 @export var zoom_speed := 1.0
 @export var pan_speed := 1.0
 var zoom_smoothing:
@@ -46,7 +58,6 @@ var rdmain := RenderingServer.get_rendering_device()
 var textureRD: Texture2DRD # render texture to use the store the simulation results in
 var shader : RID
 var pipeline : RID
-#var fmt := RDTextureFormat.new()
 var view := RDTextureView.new()
 var input_buffer : RID
 var output_buffer : RID
@@ -54,7 +65,6 @@ var output_buffer : RID
 @export
 var render_material := ShaderMaterial.new()
 
-#@onready var screen_size := get_viewport().get_visible_rect().size
 static var sim_paused :bool = true
 var sim_step_forward :bool = false
 
@@ -71,26 +81,24 @@ func _input(event: InputEvent) -> void:
 	var screen_size := get_viewport().get_visible_rect().size
 	
 	if event is InputEventMouseMotion:
-		pointer_x = (((event.position.x / screen_size.x) - zoom_pos.x) * zoom_amount + zoom_pos.x) * buffer_size.x
-		pointer_y = (((event.position.y / screen_size.y) - zoom_pos.y) * zoom_amount + zoom_pos.y) * buffer_size.y
+		pointer = (((event.position / screen_size) * window_aspect_ratio - zoom_pos) * zoom_amount + zoom_pos) * Vector2(buffer_size)
 		
 		# pan the view with middle mouse drag
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_MIDDLE):
-			zoom_pos -= event.relative / screen_size * zoom_amount * pan_speed
+			zoom_pos -= ((event.relative / screen_size) * window_aspect_ratio) * zoom_amount * pan_speed
 	
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			zoom_pos = (((event.position / screen_size) - zoom_pos) * zoom_amount + zoom_pos)
+			zoom_pos = (((event.position / screen_size) * window_aspect_ratio - zoom_pos) * zoom_amount + zoom_pos)
 			zoom_amount -= 0.05 * zoom_smoothing
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			#zoom_pos = (((event.position / screen_size) - zoom_pos) * zoom_amount + zoom_pos)
+			zoom_pos = (((event.position / screen_size) * window_aspect_ratio - zoom_pos) * zoom_amount + zoom_pos)
 			zoom_amount += 0.05 * zoom_smoothing
 
 func _ready():
 	Engine.max_fps = cap_fps
 	
-	# way better performance without scaling
-	get_window().size = buffer_size
+	#zoom_amount = max_zoom
 	
 	view = RDTextureView.new()
 	textureRD = Texture2DRD.new()
@@ -106,7 +114,7 @@ func _exit_tree():
 		textureRD.texture_rd_rid = RID()
 	RenderingServer.call_on_render_thread(_free_compute_resources)
 
-const O_CHAR = "o"
+const B_CHAR = "b"
 func init_world() -> Image:
 	var world_texture := Image.create_empty(
 		buffer_size.x,
@@ -126,12 +134,9 @@ func init_world() -> Image:
 				var y :int= i / buffer_size.x
 				world_texture.set_pixel(x, y, Color(randi_range(0, 1), 0.0, 0.0, 0.0))
 		init_state.PATTERN: # simulation starts with cell states loaded from a pattern file (.rle)
-#				I'm gonna use RegEx to decode the RLEs, it's not the fastest but perhaps the simplest
-#				way to do this. it is 0.002026 of a second slower when compared to an ASCII decoder in
-#				opening a medium sized rle file, but I like RegEx, so I don't care
-				var pattern_file = FileAccess.open(rle_world, FileAccess.READ)
-				var content = pattern_file.get_as_text()
-				var data : String
+				# I'm gonna use RegEx to decode the RLEs, it's not the fastest but perhaps the simplest
+				# way to do this. I am aware that there are more performant ways to decode run legth files
+				var content  = FileAccess.open(rle_world, FileAccess.READ).get_as_text()
 				var pattern_size : Vector2i
 				# finds digits of any length '\d+' after 'x = '
 				var pattern_size_regex = RegEx.create_from_string(r'(?<=x = )\d+')
@@ -140,58 +145,53 @@ func init_world() -> Image:
 				pattern_size_regex.compile(r'(?<=y = )\d+')
 				pattern_size.y = int(pattern_size_regex.search(content).get_string())
 				
-				# match lines starting with # and x and the ! character 
-				var not_data = RegEx.create_from_string(r'#.+\s|x.+\n|!|\n')
-				# we remove the ! character that denotes the last row
-				# but we want to match the last row as a row so we add the $
-				# I did try not removing the ! and matching rows with anything
-				# that is followed by a $ or ! but it messed with the order of the match
-				data = not_data.sub(content, "", true) + "$"
-				print("Pattern Size: ", pattern_size)
+				# match lines starting with # or x
+				# those are the comments and the header lines 
+				var not_data = RegEx.create_from_string(r'#.+\s|x.+\n|\n')
+				var data : String = not_data.sub(content, "", true) # strip away the comments and the header
 				
 				# the pattern should fit inside the world
-				if buffer_size.x < pattern_size.x or buffer_size.y < pattern_size.y: 
-					print("fuuuuuuck")
-					#buffer_size = pattern_size
-				# I need to find a way to scale up the buffer so that the pattern fits
+				print("Pattern Size: ", pattern_size)
 				print("Buffer Size: ", buffer_size)
 				
 				# place the pattern at the center of the world
 				var pattern_pos : Vector2i = (buffer_size / 2) - (pattern_size / 2)
-				#var pattern_pos : Vector2i = Vector2i.ZERO
-				
 				world_texture.fill(Color.BLACK)
-				
-				# rows are separated with the $ character
-				var get_rows = RegEx.create_from_string(r'(\d*[bo])*[\$]')
-				var rows = get_rows.search_all(data)
-				for row in rows:
-					#print(row.get_string())
-					var pixel_index_in_row : int = 0
-					# any number of digits followed by a 'b' or an 'o'
-					var run_length = RegEx.create_from_string(r'\d*[bo]')
-					for r in run_length.search_all(row.get_string()):
-						#print(r.get_string())
-						var alive : bool = r.get_string().ends_with(O_CHAR)
-						var length : int = int(r.get_string())
-						if r.get_string().length() == 1: length = 1
-						if not alive:
-							pixel_index_in_row += length
-						else:
-							for i in range(length):
-								world_texture.set_pixel(pattern_pos.x + pixel_index_in_row, pattern_pos.y, 
-								Color.WHITE)
-								pixel_index_in_row += 1
-					pattern_pos.y += 1
-				
-	return world_texture
+
+				var pixel_index_in_row : int = 0
+				# any number of digits followed by any one of these characters b o $ !
+				var run_length = RegEx.create_from_string(r'\d*[bo\$!]')
+				for r in run_length.search_all(data):
+					
+					# the integer number before the symbol is a multiplier of it's occurance
+					# if there's no number before the symbol it means the occurance multiplier is 1
+					var length : int = int(r.get_string())
+					if r.get_string().length() == 1: length = 1
+					
+					# the $ symbol means go to the next row
+					if r.get_string().ends_with("$"):
+						pattern_pos.y += length
+						pixel_index_in_row = 0
+						continue
+					
+					# o means alive and b means dead
+					var dead : bool = r.get_string().ends_with(B_CHAR)
+					if dead:
+						pixel_index_in_row += length
+					else:
+						for i in range(length):
+							world_texture.set_pixel(pattern_pos.x + pixel_index_in_row, pattern_pos.y, 
+							Color.WHITE)
+							pixel_index_in_row += 1
 	
+	return world_texture
+
 
 func build_buffers():
 	var world_texture := init_world()
 	var data := world_texture.get_data()
 	var fmt := RDTextureFormat.new()
-	#if init_with == init_state.PATTERN:
+	#if init_with == init_state.IMAGE:
 		#buffer_size.x = world_texture.get_width()
 		#buffer_size.y = world_texture.get_height()
 	
@@ -199,12 +199,9 @@ func build_buffers():
 	fmt.height = buffer_size.y
 	fmt.format = RenderingDevice.DATA_FORMAT_R32G32_SFLOAT
 	#fmt.format = RenderingDevice.DATA_FORMAT_R32_SFLOAT
-	#fmt.format = RenderingDevice.DATA_FORMAT_R32G32B32A32_SFLOAT
 	fmt.usage_bits = RenderingDevice.TEXTURE_USAGE_CAN_UPDATE_BIT \
 					| RenderingDevice.TEXTURE_USAGE_STORAGE_BIT \
-					#| RenderingDevice.TEXTURE_USAGE_CAN_COPY_FROM_BIT \
 					| RenderingDevice.TEXTURE_USAGE_SAMPLING_BIT
-					#| RenderingDevice.SamplerRepeatMode.SAMPLER_REPEAT_MODE_REPEAT
 	
 	input_buffer = rdmain.texture_create(fmt, RDTextureView.new(), [data])
 	output_buffer = rdmain.texture_create(fmt, RDTextureView.new(), [data])
@@ -214,12 +211,16 @@ func build_buffers():
 
 	# to see the first frame of the sim / the init world
 	render_material.set_shader_parameter("buffer", textureRD)
-
+	render_material.set_shader_parameter("zoom_center", zoom_pos)
+	render_material.set_shader_parameter("zoom", zoom_amount)
+	#render_material.set_shader_parameter("zoom_correction", corrective_zoom)	
+	render_material.set_shader_parameter("resolution", get_window().size)
+	
+	
 	# SHADER + PIPELINE
 	var shader_file := load("res://src/GoL.glsl") as RDShaderFile
 	shader = rdmain.shader_create_from_spirv(shader_file.get_spirv())
 	pipeline = rdmain.compute_pipeline_create(shader)
-
 
 func run_simulation():
 	# Flip buffers via uniformsets
@@ -237,14 +238,13 @@ func run_simulation():
 	rdmain.compute_list_bind_uniform_set(compute_list, input_set, 0)
 	rdmain.compute_list_bind_uniform_set(compute_list, output_set, 1)
 	
-	
 	# PUSH CONSTANT PARAMETERS
 	var params := PackedFloat32Array(
 		[
 			after_glow,
 			pointer_radius,
-			pointer_x,
-			pointer_y,
+			pointer.x,
+			pointer.y,
 			pointer_buttons,
 			buffer_size.x,
 			buffer_size.y,
@@ -262,11 +262,10 @@ func run_simulation():
 
 	# pass the render target texture to a shader uniform for displaying it
 	render_material.set_shader_parameter("buffer", textureRD)
-	render_material.set_shader_parameter("resolution", buffer_size);
+	render_material.set_shader_parameter("resolution", get_window().size) # buffer_size)
 	
 	rdmain.free_rid(input_set)
 	rdmain.free_rid(output_set)
-
 
 var ping : bool = false
 func flip_buffers():
@@ -299,7 +298,6 @@ func _create_uniform_set(texture_rd: RID, _uniform_set: int) -> RID:
 	var new_set = [uniform]
 	return rdmain.uniform_set_create(new_set, shader, _uniform_set)
 
-
 func _free_compute_resources():
 	if input_buffer:
 		rdmain.free_rid(input_buffer)
@@ -307,4 +305,3 @@ func _free_compute_resources():
 		rdmain.free_rid(output_buffer)
 	if shader:
 		rdmain.free_rid(shader)
-	# TODO: consider other RIDs

@@ -16,9 +16,13 @@ vec3 hsv2rgb(vec3 c)
 
 void fragment()
 {
-	vec2 uv = clamp((UV - zoom_center) * zoom + zoom_center, vec2(0.), vec2(1.));
+	vec2 aspect_ratio = vec2(resolution) / float(min(resolution.x, resolution.y));
+	
+	vec2 uv = clamp((UV * aspect_ratio - zoom_center) * zoom + zoom_center, vec2(0.), vec2(1.));
+	//vec2 uv = (UV * aspect_ratio - zoom_center * aspect_ratio) * zoom * zoom_correction + zoom_center * aspect_ratio;
 	vec2 cell = texture(buffer, uv).rg;
+	COLOR.rgb = color * cell.g;
+	//COLOR.rg = fract(uv);
 	//vec3 c = vec3(hsv2rgb(vec3(mod(0.8 * TIME + 0.7, 1.0), (1.0 - cell.g), cell.g)));
 	//COLOR.rgb = c;
-	COLOR.rgb = color * cell.g;
 }
